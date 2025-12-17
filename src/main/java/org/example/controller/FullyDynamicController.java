@@ -15,6 +15,28 @@ public class FullyDynamicController {
 
     @Autowired
     private DynamicCrudService dynamicCrudService;
+    
+    /**
+     * 获取表的列信息
+     *
+     * @param tableName 表名
+     * @return 表的列信息
+     */
+    @GetMapping("/{tableName}/columns")
+    public ResponseEntity<Map<String, Object>> getTableColumns(@PathVariable String tableName) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            List<Object[]> result = dynamicCrudService.getTableColumns(tableName);
+            response.put("success", true);
+            response.put("data", result);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "获取表列信息失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
 
     /**
      * 创建表（基于传入的数据字段）

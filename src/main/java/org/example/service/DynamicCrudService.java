@@ -146,6 +146,22 @@ public class DynamicCrudService {
     }
     
     /**
+     * 获取表的列信息
+     * 
+     * @param tableName 表名
+     * @return 列信息列表
+     */
+    @Transactional(readOnly = true)
+    public List<Object[]> getTableColumns(String tableName) {
+        // 验证表是否存在
+        validateTableExists(tableName);
+        
+        String sql = "DESCRIBE " + tableName;
+        Query query = entityManager.createNativeQuery(sql);
+        return query.getResultList();
+    }
+    
+    /**
      * 验证表是否存在
      * @param tableName 表名
      */

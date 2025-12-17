@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>动态数据管理系统</title>
+    <title>动态表管理</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -14,37 +15,26 @@
         .container {
             margin-bottom: 30px;
         }
-        h1 {
-            text-align: center;
-            color: #333;
-        }
         .form-group {
             margin-bottom: 15px;
         }
-        .form-group label {
+        label {
             display: block;
             margin-bottom: 5px;
             font-weight: bold;
         }
-        .form-group input, .form-group textarea, .form-group select {
+        input, textarea {
             width: 100%;
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
             box-sizing: border-box;
         }
-        .form-row {
-            display: flex;
-            gap: 15px;
-        }
-        .form-row .form-group {
-            flex: 1;
-        }
         button {
             background-color: #007bff;
             color: white;
+            padding: 10px 20px;
             border: none;
-            padding: 10px 16px;
             border-radius: 4px;
             cursor: pointer;
             margin-right: 10px;
@@ -52,26 +42,11 @@
         button:hover {
             background-color: #0056b3;
         }
-        button.delete {
+        button.danger {
             background-color: #dc3545;
         }
-        button.delete:hover {
+        button.danger:hover {
             background-color: #bd2130;
-        }
-        button.edit {
-            background-color: #ffc107;
-            color: #212529;
-        }
-        button.edit:hover {
-            background-color: #e0a800;
-        }
-        .response {
-            background-color: #f8f9fa;
-            border: 1px solid #eee;
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 4px;
-            white-space: pre-wrap;
         }
         table {
             width: 100%;
@@ -79,28 +54,48 @@
             margin-top: 20px;
         }
         th, td {
+            border: 1px solid #ddd;
             padding: 12px;
             text-align: left;
-            border-bottom: 1px solid #ddd;
         }
         th {
             background-color: #f2f2f2;
-            font-weight: bold;
         }
-        tr:hover {
-            background-color: #f5f5f5;
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
         }
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .hidden {
+            display: none;
+        }
+        .actions {
+            display: flex;
+            gap: 5px;
+        }
+        /* 模态框样式 */
         .modal {
             display: none;
             position: fixed;
-            z-index: 1;
+            z-index: 1000;
             left: 0;
             top: 0;
             width: 100%;
             height: 100%;
-            overflow: auto;
-            background-color: rgb(0,0,0);
-            background-color: rgba(0,0,0,0.4);
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+        .modal.show {
+            display: block;
         }
         .modal-content {
             background-color: #fefefe;
@@ -115,571 +110,437 @@
             float: right;
             font-size: 28px;
             font-weight: bold;
+            cursor: pointer;
         }
         .close:hover,
         .close:focus {
             color: black;
             text-decoration: none;
-            cursor: pointer;
         }
-        .actions {
-            display: flex;
-            gap: 5px;
-        }
-        .dynamic-field {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-        .dynamic-field input {
-            flex: 1;
-        }
-        .dynamic-field button {
-            flex: 0 0 auto;
-            padding: 8px 12px;
-        }
-        .hidden {
-            display: none;
-        }
-        #editModal .form-group {
-            margin-bottom: 10px;
-        }
-        .error {
-            color: red;
-            font-weight: bold;
-        }
-        .success {
-            color: green;
-            font-weight: bold;
+        .modal-actions {
+            margin-top: 20px;
+            text-align: right;
         }
     </style>
 </head>
 <body>
-    <h1>动态数据管理系统</h1>
-    
-    <!-- 第一步：初始化对象结构 -->
-    <div class="container" id="initSection">
-        <h2>第一步：定义数据结构</h2>
-        <div class="form-row">
+    <div id="app">
+        <h1>动态表管理系统</h1>
+        
+        <!-- 步骤1：创建表 -->
+        <div class="container" v-if="!tableName">
+            <h2>第一步：创建新表</h2>
             <div class="form-group">
-                <label for="tableName">表名 *</label>
-                <input type="text" id="tableName" placeholder="请输入表名" value="dynamic_table">
+                <label for="tableNameInput">表名（留空则自动生成）：</label>
+                <input type="text" id="tableNameInput" v-model="inputTableName" placeholder="例如：users_table">
             </div>
-        </div>
-        
-        <h3>对象字段定义</h3>
-        <div id="objectFields">
-            <div class="dynamic-field">
-                <input type="text" class="fieldName" placeholder="字段名 (例如: name)" value="name">
-                <input type="text" class="fieldValue" placeholder="字段值示例 (例如: 商品名称)" value="商品名称">
-                <button type="button" onclick="removeField(this)">-</button>
+            <div class="form-group">
+                <label for="sampleData">示例行数据（JSON格式）：</label>
+                <textarea id="sampleData" v-model="sampleData" rows="6" placeholder='{"name": "张三", "age": 25, "email": "zhangsan@example.com"}'></textarea>
             </div>
-            <div class="dynamic-field">
-                <input type="text" class="fieldName" placeholder="字段名 (例如: price)" value="price">
-                <input type="text" class="fieldValue" placeholder="字段值示例 (例如: 99.99)" value="99.99">
-                <button type="button" onclick="removeField(this)">-</button>
-            </div>
+            <button @click="createTable">创建表</button>
         </div>
-        <button type="button" onclick="addField()">添加字段</button>
-        <button type="button" onclick="initializeTable()">初始化表结构</button>
-        <div id="initMessage"></div>
-    </div>
-    
-    <!-- 第二步：数据管理（默认隐藏） -->
-    <div class="container hidden" id="managementSection">
-        <h2>数据管理</h2>
-        
-        <h3>插入数据</h3>
-        <div id="insertDataFields">
-            <!-- 字段将根据初始化时的结构动态生成 -->
-        </div>
-        <button type="button" onclick="insertData()">插入数据</button>
-        <div id="insertMessage"></div>
-        
-        <h3>数据列表</h3>
-        <table id="dataTable">
-            <thead>
-                <tr id="tableHeader">
-                    <!-- 表头将根据初始化时的结构动态生成 -->
-                </tr>
-            </thead>
-            <tbody id="tableBody">
-                <!-- 数据将动态填充 -->
-            </tbody>
-        </table>
-        <button type="button" onclick="loadAllData()">刷新数据</button>
-    </div>
-    
-    <!-- 编辑数据模态框 -->
-    <div id="editModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeEditModal()">&times;</span>
-            <h2>编辑数据</h2>
-            <form id="editForm">
-                <input type="hidden" id="editId">
-                <div id="editFormFields">
-                    <!-- 编辑字段将动态生成 -->
+
+        <!-- 步骤2：管理表数据 -->
+        <div class="container" v-else>
+            <h2>表：{{ tableName }}</h2>
+            <button @click="showAddModal" class="primary">添加记录</button>
+            <button @click="dropTable" class="danger">删除表</button>
+            <button @click="refreshData">刷新数据</button>
+            
+            <!-- 显示数据 -->
+            <div class="container">
+                <h3>表数据</h3>
+                <div v-if="message" :class="['alert', message.type === 'success' ? 'alert-success' : 'alert-error']">
+                    {{ message.text }}
                 </div>
-                <button type="button" onclick="updateData()">更新数据</button>
-                <div id="updateMessage"></div>
-            </form>
+                
+                <table v-if="tableData.length > 0">
+                    <thead>
+                        <tr>
+                            <th v-for="column in columns" :key="column">{{ column }}</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(row, index) in tableData" :key="index">
+                            <td v-for="column in columns" :key="column">
+                                {{ row[column] }}
+                            </td>
+                            <td>
+                                <div class="actions">
+                                    <button @click="showEditModal(index, row)">编辑</button>
+                                    <button @click="deleteRow(index, row.id)" class="danger">删除</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p v-else>暂无数据</p>
+            </div>
         </div>
-    </div>
-    
-    <!-- 响应结果显示 -->
-    <div class="container">
-        <h2>操作结果</h2>
-        <div class="response" id="responseArea"></div>
+        
+        <!-- 添加记录模态框 -->
+        <div :class="['modal', { show: showAddModalFlag }]" id="addModal">
+            <div class="modal-content">
+                <span class="close" @click="closeAddModal">&times;</span>
+                <h3>添加新记录</h3>
+                <div v-for="(value, key) in newData" :key="key" class="form-group">
+                    <label :for="'new_' + key">{{ key }}:</label>
+                    <input :id="'new_' + key" v-model="newData[key]" type="text">
+                </div>
+                <div class="modal-actions">
+                    <button @click="closeAddModal">取消</button>
+                    <button @click="addRecord">添加记录</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 编辑记录模态框 -->
+        <div :class="['modal', { show: showEditModalFlag }]" id="editModal">
+            <div class="modal-content">
+                <span class="close" @click="closeEditModal">&times;</span>
+                <h3>编辑记录</h3>
+                <div v-for="(value, key) in editingData" :key="key" class="form-group">
+                    <label :for="'edit_' + key">{{ key }}:</label>
+                    <input :id="'edit_' + key" v-model="editingData[key]" type="text">
+                </div>
+                <div class="modal-actions">
+                    <button @click="closeEditModal">取消</button>
+                    <button @click="saveEdit">保存记录</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        const baseUrl = 'http://localhost:8080/api/fully-dynamic';
-        let tableColumns = []; // 存储表的列信息
-        let currentEditData = {}; // 存储当前编辑的数据
-        let currentTableName = ''; // 当前表名
+        const { createApp, ref, reactive, onMounted } = Vue;
         
-        // 显示消息
-        function showMessage(elementId, message, isSuccess) {
-            const element = document.getElementById(elementId);
-            element.textContent = message;
-            element.className = isSuccess ? 'success' : 'error';
-        }
-        
-        // 显示响应结果
-        function displayResponse(data) {
-            document.getElementById('responseArea').textContent = JSON.stringify(data, null, 2);
-        }
-        
-        // 清空响应结果
-        function clearResponse() {
-            document.getElementById('responseArea').textContent = '';
-        }
-        
-        // 添加字段输入框
-        function addField() {
-            const container = document.getElementById('objectFields');
-            const fieldDiv = document.createElement('div');
-            fieldDiv.className = 'dynamic-field';
-            fieldDiv.innerHTML = `
-                <input type="text" class="fieldName" placeholder="字段名 (例如: name)">
-                <input type="text" class="fieldValue" placeholder="字段值示例 (例如: 商品名称)">
-                <button type="button" onclick="removeField(this)">-</button>
-            `;
-            container.appendChild(fieldDiv);
-        }
-        
-        // 移除字段输入框
-        function removeField(button) {
-            button.parentElement.remove();
-        }
-        
-        // 获取表名
-        function getTableName() {
-            return document.getElementById('tableName').value.trim();
-        }
-        
-        // 初始化表结构
-        async function initializeTable() {
-            clearResponse();
-            const tableName = getTableName();
-            
-            if (!tableName) {
-                showMessage('initMessage', '请输入表名', false);
-                return;
-            }
-            
-            currentTableName = tableName;
-            
-            // 收集字段定义
-            const fieldElements = document.querySelectorAll('#objectFields .dynamic-field');
-            const sampleData = {};
-            
-            tableColumns = []; // 重置列信息
-            
-            for (let field of fieldElements) {
-                const keyInput = field.querySelector('.fieldName');
-                const valueInput = field.querySelector('.fieldValue');
+        createApp({
+            setup() {
+                // 表相关状态
+                const tableName = ref(localStorage.getItem('dynamic_table_name') || '');
+                const inputTableName = ref('');
+                const sampleData = ref('{\n  "name": "张三",\n  "age": 25,\n  "email": "zhangsan@example.com"\n}');
                 
-                const key = keyInput.value.trim();
-                let value = valueInput.value.trim();
+                // 数据相关状态
+                const tableData = ref([]);
+                const columns = ref([]);
+                const newData = reactive({});
+                const message = ref(null);
                 
-                if (key && value) {
-                    // 尝试转换数值类型
-                    if (!isNaN(value) && !isNaN(parseFloat(value))) {
-                        value = parseFloat(value);
-                    }
-                    sampleData[key] = value;
-                    tableColumns.push(key); // 记录列名
-                }
-            }
-            
-            if (Object.keys(sampleData).length === 0) {
-                showMessage('initMessage', '请至少提供一个字段', false);
-                return;
-            }
-            
-            try {
-                const response = await fetch(`${baseUrl}/${tableName}/create-table`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(sampleData)
-                });
+                // 模态框状态
+                const showAddModalFlag = ref(false);
+                const showEditModalFlag = ref(false);
                 
-                const result = await response.json();
-                displayResponse(result);
+                // 编辑相关状态
+                const editingIndex = ref(-1);
+                const editingData = reactive({});
                 
-                if (result.success) {
-                    showMessage('initMessage', '表结构初始化成功', true);
-                    // 显示数据管理区域
-                    document.getElementById('initSection').classList.add('hidden');
-                    document.getElementById('managementSection').classList.remove('hidden');
-                    
-                    // 根据初始化的字段生成数据录入表单
-                    generateDataEntryForm();
-                    
-                    // 生成表格头部
-                    generateTableHeader();
-                    
-                    // 延迟加载数据，确保表创建完成
-                    setTimeout(() => {
-                        loadAllData();
-                    }, 1000);
-                } else {
-                    showMessage('initMessage', '表结构初始化失败: ' + result.message, false);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                displayResponse({ error: error.message });
-                showMessage('initMessage', '初始化表结构时发生错误: ' + error.message, false);
-            }
-        }
-        
-        // 根据初始化的字段生成数据录入表单
-        function generateDataEntryForm() {
-            const container = document.getElementById('insertDataFields');
-            container.innerHTML = ''; // 清空现有内容
-            
-            for (let column of tableColumns) {
-                if (column === 'id') continue; // 跳过ID字段
+                // 显示添加模态框
+                const showAddModal = () => {
+                    showAddModalFlag.value = true;
+                };
                 
-                const fieldDiv = document.createElement('div');
-                fieldDiv.className = 'dynamic-field';
-                fieldDiv.innerHTML = `
-                    <input type="text" class="dataKey" value="${column}" readonly>
-                    <input type="text" class="dataValue" placeholder="请输入${column}的值">
-                    <button type="button" onclick="removeField(this)">-</button>
-                `;
-                container.appendChild(fieldDiv);
-            }
-        }
-        
-        // 生成表格头部
-        function generateTableHeader() {
-            const header = document.getElementById('tableHeader');
-            header.innerHTML = '';
-            
-            // 添加ID列
-            const idTh = document.createElement('th');
-            idTh.textContent = 'ID';
-            header.appendChild(idTh);
-            
-            // 添加其他列
-            for (let column of tableColumns) {
-                if (column === 'id') continue; // 跳过ID字段
+                // 关闭添加模态框
+                const closeAddModal = () => {
+                    showAddModalFlag.value = false;
+                };
                 
-                const th = document.createElement('th');
-                th.textContent = column;
-                header.appendChild(th);
-            }
-            
-            // 添加操作列
-            const actionTh = document.createElement('th');
-            actionTh.textContent = '操作';
-            header.appendChild(actionTh);
-        }
-        
-        // 插入数据
-        async function insertData() {
-            clearResponse();
-            const tableName = currentTableName;
-            
-            if (!tableName) {
-                showMessage('insertMessage', '表名不能为空', false);
-                return;
-            }
-            
-            // 收集数据
-            const dataElements = document.querySelectorAll('#insertDataFields .dynamic-field');
-            const data = {};
-            
-            for (let field of dataElements) {
-                const keyInput = field.querySelector('.dataKey');
-                const valueInput = field.querySelector('.dataValue');
-                
-                const key = keyInput.value.trim();
-                let value = valueInput.value.trim();
-                
-                if (key && value) {
-                    // 尝试转换数值类型
-                    if (!isNaN(value) && !isNaN(parseFloat(value))) {
-                        value = parseFloat(value);
-                    }
-                    data[key] = value;
-                }
-            }
-            
-            if (Object.keys(data).length === 0) {
-                showMessage('insertMessage', '请至少提供一个字段数据', false);
-                return;
-            }
-            
-            try {
-                const response = await fetch(`${baseUrl}/${tableName}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-                
-                const result = await response.json();
-                displayResponse(result);
-                
-                if (result.success) {
-                    showMessage('insertMessage', '数据插入成功', true);
-                    // 清空输入框
-                    document.querySelectorAll('#insertDataFields .dataValue').forEach(input => {
-                        input.value = '';
+                // 显示编辑模态框
+                const showEditModal = (index, rowData) => {
+                    editingIndex.value = index;
+                    // 深拷贝 rowData 到 editingData
+                    Object.keys(rowData).forEach(key => {
+                        editingData[key] = rowData[key];
                     });
-                    loadAllData(); // 刷新数据
-                } else {
-                    showMessage('insertMessage', '数据插入失败: ' + result.message, false);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                displayResponse({ error: error.message });
-                showMessage('insertMessage', '插入数据时发生错误: ' + error.message, false);
-            }
-        }
-        
-        // 加载所有数据
-        async function loadAllData() {
-            clearResponse();
-            const tableName = currentTableName;
-            
-            if (!tableName) {
-                return;
-            }
-            
-            try {
-                const response = await fetch(`${baseUrl}/${tableName}`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
+                    showEditModalFlag.value = true;
+                };
+                
+                // 关闭编辑模态框
+                const closeEditModal = () => {
+                    showEditModalFlag.value = false;
+                    editingIndex.value = -1;
+                    // 清空 editingData
+                    Object.keys(editingData).forEach(key => {
+                        delete editingData[key];
+                    });
+                };
+                
+                // 创建表
+                const createTable = async () => {
+                    try {
+                        let actualTableName = inputTableName.value;
+                        // 如果没有提供表名，则生成一个随机表名
+                        if (!actualTableName) {
+                            actualTableName = 'table_' + Math.random().toString(36).substring(2, 10);
+                        }
+                        
+                        const sampleDataRow = JSON.parse(sampleData.value);
+                        
+                        const response = await fetch(`/api/fully-dynamic/${actualTableName}/create-table`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(sampleDataRow)
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            tableName.value = actualTableName;
+                            localStorage.setItem('dynamic_table_name', actualTableName);
+                            
+                            // 初始化新数据对象
+                            Object.keys(sampleDataRow).forEach(key => {
+                                if (key !== 'id') {
+                                    newData[key] = '';
+                                }
+                            });
+                            
+                            showMessage('表创建成功', 'success');
+                            await loadData();
+                        } else {
+                            showMessage('表创建失败: ' + result.message, 'error');
+                        }
+                    } catch (error) {
+                        showMessage('发生错误: ' + error.message, 'error');
                     }
-                });
+                };
                 
-                const result = await response.json();
-                displayResponse(result);
-                
-                if (result.success) {
-                    renderTableData(result.data);
-                } else {
-                    alert('数据查询失败: ' + result.message);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                displayResponse({ error: error.message });
-                alert('查询数据时发生错误');
-            }
-        }
-        
-        // 渲染表格数据
-        function renderTableData(data) {
-            const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = '';
-            
-            if (!data || data.length === 0) {
-                const row = tbody.insertRow();
-                const cell = row.insertCell();
-                cell.colSpan = tableColumns.length + 2; // +2 for ID and Actions columns
-                cell.textContent = '暂无数据';
-                cell.style.textAlign = 'center';
-                return;
-            }
-            
-            // 遍历每条数据
-            data.forEach(item => {
-                const row = tbody.insertRow();
-                
-                // 添加ID列（假设第一列是ID）
-                const idCell = row.insertCell();
-                idCell.textContent = item[0];
-                
-                // 添加其他字段数据
-                for (let i = 0; i < tableColumns.length; i++) {
-                    if (tableColumns[i] === 'id') continue; // 跳过ID字段
+                // 删除表
+                const dropTable = async () => {
+                    if (!confirm(`确定要删除表 "${tableName.value}" 吗？此操作不可恢复。`)) {
+                        return;
+                    }
                     
-                    const cell = row.insertCell();
-                    // 数据索引需要考虑ID字段的位置
-                    const dataIndex = i + 1; // 因为ID在第一位
-                    cell.textContent = item[dataIndex] !== undefined ? item[dataIndex] : '';
-                }
+                    try {
+                        const response = await fetch(`/api/fully-dynamic/${tableName.value}/drop-table`, {
+                            method: 'DELETE'
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            // 清除本地状态
+                            tableName.value = '';
+                            inputTableName.value = '';
+                            localStorage.removeItem('dynamic_table_name');
+                            tableData.value = [];
+                            columns.value = [];
+                            Object.keys(newData).forEach(key => {
+                                delete newData[key];
+                            });
+                            
+                            showMessage('表删除成功', 'success');
+                        } else {
+                            showMessage('表删除失败: ' + result.message, 'error');
+                        }
+                    } catch (error) {
+                        showMessage('发生错误: ' + error.message, 'error');
+                    }
+                };
                 
-                // 添加操作列
-                const actionCell = row.insertCell();
-                actionCell.className = 'actions';
-                actionCell.innerHTML = `
-                    <button class="edit" onclick="openEditModal(${item[0]}, ${JSON.stringify(item).replace(/"/g, '&quot;')})">编辑</button>
-                    <button class="delete" onclick="deleteData(${item[0]})">删除</button>
-                `;
-            });
-        }
-        
-        // 打开编辑模态框
-        function openEditModal(id, rowData) {
-            // 保存当前编辑的数据
-            currentEditData = {};
-            for (let i = 0; i <= tableColumns.length; i++) {
-                currentEditData[i < tableColumns.length ? tableColumns[i] : 'id'] = rowData[i];
-            }
-            
-            document.getElementById('editId').value = id;
-            
-            const formFields = document.getElementById('editFormFields');
-            formFields.innerHTML = '';
-            
-            // 为每个字段生成编辑输入框
-            for (let i = 0; i < tableColumns.length; i++) {
-                const column = tableColumns[i];
-                if (column === 'id') continue; // 跳过ID字段
+                // 加载数据
+                const loadData = async () => {
+                    try {
+                        const response = await fetch(`/api/fully-dynamic/${tableName.value}`);
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            // 提取列名
+                            if (result.data.length > 0) {
+                                // 从第一行数据推断列名
+                                const firstRow = result.data[0];
+                                columns.value = Object.keys(firstRow);
+                                
+                                // 如果newData为空，初始化它（解决刷新页面后输入框消失的问题）
+                                if (Object.keys(newData).length === 0) {
+                                    columns.value.forEach(col => {
+                                        if (col !== 'id') {
+                                            newData[col] = '';
+                                        }
+                                    });
+                                }
+                            }
+                            
+                            // 处理数据，将数组转换为对象
+                            tableData.value = result.data.map(rowArray => {
+                                const rowObj = {};
+                                columns.value.forEach((col, index) => {
+                                    rowObj[col] = rowArray[index];
+                                });
+                                return rowObj;
+                            });
+                        } else {
+                            showMessage('数据加载失败: ' + result.message, 'error');
+                        }
+                    } catch (error) {
+                        showMessage('数据加载出错: ' + error.message, 'error');
+                    }
+                };
                 
-                const fieldValue = rowData[i + 1]; // +1 because ID is at index 0
+                // 刷新数据
+                const refreshData = () => {
+                    loadData();
+                };
                 
-                const fieldDiv = document.createElement('div');
-                fieldDiv.className = 'form-group';
-                fieldDiv.innerHTML = `
-                    <label for="edit_${column}">${column}:</label>
-                    <input type="text" id="edit_${column}" value="${fieldValue !== null && fieldValue !== undefined ? fieldValue : ''}">
-                `;
-                formFields.appendChild(fieldDiv);
-            }
-            
-            // 清空消息
-            document.getElementById('updateMessage').textContent = '';
-            
-            // 显示模态框
-            document.getElementById('editModal').style.display = 'block';
-        }
-        
-        // 关闭编辑模态框
-        function closeEditModal() {
-            document.getElementById('editModal').style.display = 'none';
-        }
-        
-        // 更新数据
-        async function updateData() {
-            const tableName = currentTableName;
-            const id = document.getElementById('editId').value;
-            
-            // 收集更新数据
-            const data = {};
-            for (let column of tableColumns) {
-                if (column === 'id') continue; // 跳过ID字段
+                // 添加记录
+                const addRecord = async () => {
+                    try {
+                        const response = await fetch(`/api/fully-dynamic/${tableName.value}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(newData)
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            showMessage('记录添加成功', 'success');
+                            // 清空输入框
+                            Object.keys(newData).forEach(key => {
+                                if (key !== 'id') {
+                                    newData[key] = '';
+                                }
+                            });
+                            closeAddModal();
+                            await loadData();
+                        } else {
+                            showMessage('记录添加失败: ' + result.message, 'error');
+                        }
+                    } catch (error) {
+                        showMessage('发生错误: ' + error.message, 'error');
+                    }
+                };
                 
-                const input = document.getElementById(`edit_${column}`);
-                let value = input.value.trim();
+                // 保存编辑
+                const saveEdit = async () => {
+                    try {
+                        const id = editingData.id;
+                        const dataToSend = { ...editingData };
+                        delete dataToSend.id; // 移除id字段，避免更新时出现问题
+                        
+                        const response = await fetch(`/api/fully-dynamic/${tableName.value}?id=${id}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(dataToSend)
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            showMessage('记录更新成功', 'success');
+                            closeEditModal();
+                            await loadData();
+                        } else {
+                            showMessage('记录更新失败: ' + result.message, 'error');
+                        }
+                    } catch (error) {
+                        showMessage('发生错误: ' + error.message, 'error');
+                    }
+                };
                 
-                // 尝试转换数值类型
-                if (value && !isNaN(value) && !isNaN(parseFloat(value))) {
-                    value = parseFloat(value);
-                }
+                // 删除行
+                const deleteRow = async (index, id) => {
+                    if (!confirm('确定要删除这条记录吗？')) {
+                        return;
+                    }
+                    
+                    try {
+                        const response = await fetch(`/api/fully-dynamic/${tableName.value}?id=${id}`, {
+                            method: 'DELETE'
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            showMessage('记录删除成功', 'success');
+                            await loadData();
+                        } else {
+                            showMessage('记录删除失败: ' + result.message, 'error');
+                        }
+                    } catch (error) {
+                        showMessage('发生错误: ' + error.message, 'error');
+                    }
+                };
                 
-                if (value !== '') {
-                    data[column] = value;
-                } else {
-                    data[column] = null;
-                }
-            }
-            
-            const conditions = { id: id };
-            
-            try {
-                const queryParams = new URLSearchParams(conditions).toString();
-                const url = `${baseUrl}/${tableName}?${queryParams}`;
-                
-                const response = await fetch(url, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-                
-                const result = await response.json();
-                displayResponse(result);
-                
-                if (result.success) {
-                    showMessage('updateMessage', '数据更新成功', true);
+                // 显示消息
+                const showMessage = (text, type) => {
+                    message.value = { text, type };
                     setTimeout(() => {
-                        closeEditModal();
-                        loadAllData(); // 刷新数据
-                    }, 1000);
-                } else {
-                    showMessage('updateMessage', '数据更新失败: ' + result.message, false);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                displayResponse({ error: error.message });
-                showMessage('updateMessage', '更新数据时发生错误: ' + error.message, false);
-            }
-        }
-        
-        // 删除数据
-        async function deleteData(id) {
-            if (!confirm(`确定要删除ID为 ${id} 的数据吗？`)) {
-                return;
-            }
-            
-            const tableName = currentTableName;
-            const conditions = { id: id };
-            
-            try {
-                const queryParams = new URLSearchParams(conditions).toString();
-                const url = `${baseUrl}/${tableName}?${queryParams}`;
+                        message.value = null;
+                    }, 3000);
+                };
                 
-                const response = await fetch(url, {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json'
+                // 在组件挂载时加载数据
+                onMounted(async () => {
+                    if (tableName.value) {
+                        // 如果表名存在，获取表的列信息和数据
+                        await getTableColumns();
+                        await loadData();
                     }
                 });
                 
-                const result = await response.json();
-                displayResponse(result);
-                
-                if (result.success) {
-                    alert('数据删除成功');
-                    loadAllData(); // 刷新数据
-                } else {
-                    alert('数据删除失败: ' + result.message);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                displayResponse({ error: error.message });
-                alert('删除数据时发生错误: ' + error.message);
+                // 获取表的列信息
+                const getTableColumns = async () => {
+                    try {
+                        const response = await fetch(`/api/fully-dynamic/${tableName.value}/columns`, {
+                            method: 'GET'
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            // 从返回的结果中提取列名
+                            // DESCRIBE命令返回的结果包含列名、类型、是否为空等信息
+                            // 我们只需要列名，它是结果数组中每个子数组的第一个元素
+                            columns.value = result.data.map(columnInfo => columnInfo[0]);
+                            
+                            // 初始化newData对象
+                            columns.value.forEach(col => {
+                                if (col !== 'id') {
+                                    newData[col] = '';
+                                }
+                            });
+                        }
+                    } catch (error) {
+                        console.error('获取表列信息失败:', error);
+                        showMessage('获取表列信息失败: ' + error.message, 'error');
+                    }
+                };
+
+                return {
+                    tableName,
+                    inputTableName,
+                    sampleData,
+                    tableData,
+                    columns,
+                    newData,
+                    message,
+                    showAddModalFlag,
+                    showEditModalFlag,
+                    editingIndex,
+                    editingData,
+                    createTable,
+                    dropTable,
+                    refreshData,
+                    addRecord,
+                    saveEdit,
+                    deleteRow,
+                    showAddModal,
+                    closeAddModal,
+                    showEditModal,
+                    closeEditModal,
+                    getTableColumns
+                };
             }
-        }
-        
-        // 点击模态框外部关闭模态框
-        window.onclick = function(event) {
-            const modal = document.getElementById('editModal');
-            if (event.target == modal) {
-                closeEditModal();
-            }
-        }
+        }).mount('#app');
     </script>
 </body>
 </html>

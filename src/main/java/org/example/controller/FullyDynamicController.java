@@ -33,7 +33,7 @@ public class FullyDynamicController {
         try {
             // 根据示例数据创建表
             String sql = generateCreateTableSql(tableName, sampleData);
-            dynamicCrudService.executeUpdateSql(sql);
+            dynamicCrudService.executeDdlSql(sql);
             
             // 验证表是否创建成功
             try {
@@ -42,16 +42,45 @@ public class FullyDynamicController {
                 response.put("message", "表创建成功");
                 response.put("sql", sql); // 返回执行的SQL语句，便于调试
             } catch (Exception e) {
-                // 如果验证失败，则尝试另一种方式验证
-                dynamicCrudService.executeUpdateSql("SELECT 1 FROM " + tableName + " LIMIT 1");
-                response.put("success", true);
-                response.put("message", "表创建成功");
-                response.put("sql", sql);
+                // 如果验证失败，尝试直接查询验证
+                try {
+                    dynamicCrudService.executeSelectSql("SELECT 1 FROM " + tableName + " LIMIT 1");
+                    response.put("success", true);
+                    response.put("message", "表创建成功");
+                    response.put("sql", sql);
+                } catch (Exception ex) {
+                    // 如果两种方式都失败了，说明表创建可能真的失败了
+                    response.put("success", false);
+                    response.put("message", "表创建失败或者无法验证表是否创建成功: " + ex.getMessage());
+                    return ResponseEntity.status(500).body(response);
+                }
             }
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "表创建失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+    
+    /**
+     * 删除表
+     *
+     * @param tableName 表名
+     * @return 操作结果
+     */
+    @DeleteMapping("/{tableName}/drop-table")
+    public ResponseEntity<Map<String, Object>> dropTable(@PathVariable String tableName) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            dynamicCrudService.dropTable(tableName);
+            response.put("success", true);
+            response.put("message", "表删除成功");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "表删除失败: " + e.getMessage());
             return ResponseEntity.status(500).body(response);
         }
     }

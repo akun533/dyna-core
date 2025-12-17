@@ -108,6 +108,18 @@ public class DynamicCrudService {
     }
     
     /**
+     * 删除整个表
+     */
+    @Transactional
+    public void dropTable(String tableName) {
+        // 验证表是否存在
+        validateTableExists(tableName);
+        
+        String sql = "DROP TABLE " + tableName;
+        entityManager.createNativeQuery(sql).executeUpdate();
+    }
+    
+    /**
      * 执行任意SQL语句 (仅用于更新操作)
      */
     @Transactional
@@ -117,15 +129,40 @@ public class DynamicCrudService {
     }
     
     /**
+     * 执行DDL语句 (如CREATE TABLE, ALTER TABLE等)
+     */
+    @Transactional
+    public void executeDdlSql(String sql) {
+        entityManager.createNativeQuery(sql).executeUpdate();
+    }
+    
+    /**
+     * 执行SELECT语句 (仅用于查询操作)
+     */
+    @Transactional(readOnly = true)
+    public List<Object> executeSelectSql(String sql) {
+        Query query = entityManager.createNativeQuery(sql);
+        return query.getResultList();
+    }
+    
+    /**
      * 验证表是否存在
      * @param tableName 表名
      */
     private void validateTableExists(String tableName) {
         try {
-            // 尝试从表中选择一行数据来验证表是否存在
-            entityManager.createNativeQuery("SELECT 1 FROM " + tableName + " LIMIT 1").getSingleResult();
+            // 使用DESCRIBE语句检查表是否存在，这是MySQL中检查表是否存在的更好方法
+            entityManager.createNativeQuery("DESCRIBE " + tableName).getResultList();
         } catch (Exception e) {
-            throw new RuntimeException("表 '" + tableName + "' 不存在或无法访问: " + e.getMessage());
+            // 如果DESCRIBE失败，再尝试使用SHOW TABLES检查
+            try {
+                List<Object> tables = entityManager.createNativeQuery("SHOW TABLES LIKE '" + tableName + "'").getResultList();
+                if (tables.isEmpty()) {
+                    throw new RuntimeException("表 '" + tableName + "' 不存在");
+                }
+            } catch (Exception ex) {
+                throw new RuntimeException("表 '" + tableName + "' 不存在或无法访问: " + ex.getMessage());
+            }
         }
     }
 }

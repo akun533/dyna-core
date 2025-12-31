@@ -1,14 +1,15 @@
-# 动态数据管理系统
+# 基于模型（Model对象）的动态数据管理系统
 
-这是一个基于 Spring Boot 和原生 JDBC 实现的动态数据管理系统，允许用户在运行时动态定义数据结构并进行完整的 CRUD 操作。
+这是一个基于 Spring Boot 和 JPA/Hibernate 实现的基于模型（Model对象）的动态数据管理系统，允许用户在运行时动态定义数据结构并进行完整的 CRUD 操作。系统通过模型对象（Model Object）来管理和操作动态数据，提供更加面向对象的编程接口。
 
 ## 功能特点
 
-1. **动态表结构创建**：用户可以通过提供示例数据来动态创建数据库表结构
+1. **基于模型的动态表结构创建**：用户可以通过提供示例数据来动态创建数据库表结构，并将数据映射到模型对象
 2. **智能类型推断**：系统根据示例数据自动推断字段类型（VARCHAR, INT, DOUBLE, BOOLEAN 等）
-3. **完整的 CRUD 操作**：支持数据的增删改查操作
+3. **完整的 CRUD 操作**：支持基于模型对象的数据增删改查操作
 4. **完全动态的前端界面**：前端界面根据用户定义的数据结构动态生成表单和数据显示
 5. **表结构信息获取**：支持获取表的列信息，用于前端动态渲染
+6. **模型对象映射**：支持将数据库记录映射为模型对象，便于业务逻辑处理
 
 ## 技术架构
 
@@ -20,26 +21,26 @@
 ## 核心组件
 
 ### 1. FullyDynamicController
-处理所有动态数据管理的 REST API 请求：
+处理所有基于模型对象的动态数据管理的 REST API 请求：
 - `/api/fully-dynamic/{tableName}/create-table` - 创建表结构
 - `/api/fully-dynamic/{tableName}/columns` - 获取表列信息
-- `/api/fully-dynamic/{tableName}` (POST) - 插入数据
-- `/api/fully-dynamic/{tableName}` (GET) - 查询数据
-- `/api/fully-dynamic/{tableName}` (PUT) - 更新数据
-- `/api/fully-dynamic/{tableName}` (DELETE) - 删除数据
+- `/api/fully-dynamic/{tableName}` (POST) - 插入模型数据
+- `/api/fully-dynamic/{tableName}` (GET) - 查询模型数据
+- `/api/fully-dynamic/{tableName}` (PUT) - 更新模型数据
+- `/api/fully-dynamic/{tableName}` (DELETE) - 删除模型数据
 - `/api/fully-dynamic/{tableName}/drop-table` (DELETE) - 删除表
 
 ### 2. DynamicCrudService
-提供底层的数据操作服务，包括事务管理和 SQL 执行。
+提供基于模型对象的底层数据操作服务，包括事务管理和 SQL 执行。
 
 ### 3. DynamicSqlGenerator
-动态生成各种 SQL 语句（INSERT, SELECT, UPDATE, DELETE）。
+动态生成各种 SQL 语句（INSERT, SELECT, UPDATE, DELETE），支持模型对象的映射。
 
 ### 4. 前端界面 (index.html)
 提供用户友好的 Web 界面，支持：
 - 表结构定义
 - 动态表单生成
-- 数据展示和操作
+- 基于模型对象的数据展示和操作
 - 模态框交互模式
 
 ## 使用指南
@@ -83,9 +84,31 @@ Content-Type: application/json
 }
 ```
 
+**响应格式：**
+```
+{
+  "success": true,
+  "message": "表创建成功",
+  "sql": "CREATE TABLE ..."
+}
+```
+
 ### 获取表列信息
 ```
 GET /api/fully-dynamic/{tableName}/columns
+```
+
+**响应格式：**
+```
+{
+  "success": true,
+  "data": [
+    ["id", "BIGINT", "NO", "PRI", null, "auto_increment"],
+    ["fieldName1", "VARCHAR(255)", "YES", "", null, ""],
+    ["fieldName2", "INT", "YES", "", null, ""],
+    ["fieldName3", "DOUBLE", "YES", "", null, ""]
+  ]
+}
 ```
 
 ### 插入数据
@@ -100,9 +123,28 @@ Content-Type: application/json
 }
 ```
 
+**响应格式：**
+```
+{
+  "success": true,
+  "affectedRows": 1
+}
+```
+
 ### 查询数据
 ```
 GET /api/fully-dynamic/{tableName}
+```
+
+**响应格式：**
+```
+{
+  "success": true,
+  "data": [
+    [1, "value1", 123, 45.67],
+    [2, "value2", 456, 89.12]
+  ]
+}
 ```
 
 ### 更新数据
@@ -116,14 +158,38 @@ Content-Type: application/json
 }
 ```
 
+**响应格式：**
+```
+{
+  "success": true,
+  "affectedRows": 1
+}
+```
+
 ### 删除数据
 ```
 DELETE /api/fully-dynamic/{tableName}?id=recordId
 ```
 
+**响应格式：**
+```
+{
+  "success": true,
+  "affectedRows": 1
+}
+```
+
 ### 删除表
 ```
 DELETE /api/fully-dynamic/{tableName}/drop-table
+```
+
+**响应格式：**
+```
+{
+  "success": true,
+  "message": "表删除成功"
+}
 ```
 
 ## 项目结构
@@ -156,6 +222,8 @@ src/
 4. **数据校验**：添加更严格的数据校验规则
 5. **批量操作**：支持批量导入导出数据
 6. **表结构更新**：支持动态修改表结构
+7. **模型对象增强**：为动态数据提供强类型的模型对象映射，增强类型安全
+8. **关联关系支持**：支持模型对象间的关联关系（一对一、一对多、多对多）
 
 ## 注意事项
 
